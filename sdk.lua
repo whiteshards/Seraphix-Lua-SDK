@@ -24,7 +24,34 @@ local function formatPrint(message, messageType, silent)
     print(prefix .. " " .. message)
 end
 
+local function detectHttpFunction()
+    if request then
+        return request
+    elseif http_request then
+        return http_request
+    elseif syn and syn.request then
+        return syn.request
+    elseif HttpService and HttpService.RequestAsync then
+        return function(options)
+            return HttpService:RequestAsync(options)
+        end
+    else
+        return nil
+    end
+end
+
+local httpRequest = detectHttpFunction()
+
 local function makeRequest(method, endpoint, headers, body, silent)
+    if not httpRequest then
+        formatPrint("No HTTP function available! Make sure you're using a compatible executor.", "error", silent)
+        return {
+            success = false,
+            error = "NO_HTTP_FUNCTION",
+            message = "No HTTP function available"
+        }
+    end
+    
     local url = API_BASE_URL .. endpoint
     
     local requestOptions = {
@@ -34,14 +61,18 @@ local function makeRequest(method, endpoint, headers, body, silent)
     }
     
     if body then
-        requestOptions.Body = HttpService:JSONEncode(body)
+        if HttpService and HttpService.JSONEncode then
+            requestOptions.Body = HttpService:JSONEncode(body)
+        else
+            requestOptions.Body = game:GetService("HttpService"):JSONEncode(body)
+        end
         requestOptions.Headers["Content-Type"] = "application/json"
     end
     
     formatPrint("Making " .. method .. " request to: " .. endpoint, "info", silent)
     
     local success, response = pcall(function()
-        return HttpService:RequestAsync(requestOptions)
+        return httpRequest(requestOptions)
     end)
     
     if not success then
@@ -56,7 +87,11 @@ local function makeRequest(method, endpoint, headers, body, silent)
     local responseData
     if response.Body and response.Body ~= "" then
         local parseSuccess, parsedData = pcall(function()
-            return HttpService:JSONDecode(response.Body)
+            if HttpService and HttpService.JSONDecode then
+                return HttpService:JSONDecode(response.Body)
+            else
+                return game:GetService("HttpService"):JSONDecode(response.Body)
+            end
         end)
         
         if parseSuccess then
@@ -68,21 +103,23 @@ local function makeRequest(method, endpoint, headers, body, silent)
         responseData = {}
     end
     
-    if response.StatusCode >= 200 and response.StatusCode < 300 then
+    local statusCode = response.StatusCode or response.status_code or response.Status or 0
+    
+    if statusCode >= 200 and statusCode < 300 then
         formatPrint("Request successful: " .. (responseData.message or "No message"), "success", silent)
         return {
             success = true,
             data = responseData,
-            statusCode = response.StatusCode,
+            statusCode = statusCode,
             executionTime = responseData.executionTime
         }
     else
-        formatPrint("Request failed with status " .. response.StatusCode .. ": " .. (responseData.message or responseData.error or "Unknown error"), "error", silent)
+        formatPrint("Request failed with status " .. statusCode .. ": " .. (responseData.message or responseData.error or "Unknown error"), "error", silent)
         return {
             success = false,
             error = responseData.error or "HTTP_ERROR",
             message = responseData.message or "Request failed",
-            statusCode = response.StatusCode,
+            statusCode = statusCode,
             executionTime = responseData.executionTime
         }
     end
