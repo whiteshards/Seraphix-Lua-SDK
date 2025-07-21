@@ -167,8 +167,6 @@ return {
     script_key = script_key,
     getStatus = getStatus,
     verifyKey = verifyKey,
-    setBaseUrl = setBaseUrl,
-    getBaseUrl = getBaseUrl,
     getHWID = getHWID,
     StatusMessages = {
         KEY_VALID = "Key is valid and HWID bound successfully",
