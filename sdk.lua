@@ -1,11 +1,12 @@
 local HttpService = game:GetService("HttpService")
 
-local SeraphixSDK = {}
-SeraphixSDK.__index = SeraphixSDK
-
 local API_BASE_URL = "https://seraphix-api.vercel.app"
 
+local keysystem_id = ""
+local script_key = ""
+
 local function formatPrint(message, messageType, silent)
+    if silent == nil then silent = false end
     if silent then return end
     
     local prefix = ""
@@ -125,160 +126,54 @@ local function makeRequest(method, endpoint, headers, body, silent)
     end
 end
 
-function SeraphixSDK.new(apiToken)
-    local self = setmetatable({}, SeraphixSDK)
-    self.apiToken = apiToken
-    return self
+local function getHWID()
+    return gethwid()
 end
 
-function SeraphixSDK:getStatus(silent)
-    silent = silent or false
+local function getStatus(silent)
     return makeRequest("GET", "/v1/status", nil, nil, silent)
 end
 
-function SeraphixSDK:getMe(silent)
-    silent = silent or false
-    
-    if not self.apiToken then
-        formatPrint("API token is required for this endpoint", "error", silent)
-        return {
-            success = false,
-            error = "NO_TOKEN",
-            message = "API token is required"
-        }
-    end
-    
-    local headers = {
-        ["Authorization"] = "Bearer " .. self.apiToken
-    }
-    
-    return makeRequest("GET", "/v1/me", headers, nil, silent)
-end
-
-function SeraphixSDK:getKeysystem(keysystemId, silent)
-    silent = silent or false
-    
-    if not self.apiToken then
-        formatPrint("API token is required for this endpoint", "error", silent)
-        return {
-            success = false,
-            error = "NO_TOKEN",
-            message = "API token is required"
-        }
-    end
-    
-    if not keysystemId then
-        formatPrint("Keysystem ID is required", "error", silent)
+local function verifyKey(silent)
+    if keysystem_id == "" then
+        formatPrint("keysystem_id is not set! Please set it like: keysystem_id = 'your_id'", "error", silent)
         return {
             success = false,
             error = "NO_KEYSYSTEM_ID",
-            message = "Keysystem ID is required"
+            message = "keysystem_id is not set"
         }
     end
     
-    local headers = {
-        ["Authorization"] = "Bearer " .. self.apiToken
-    }
-    
-    local endpoint = "/v1/keysystems?id=" .. HttpService:UrlEncode(keysystemId)
-    return makeRequest("GET", endpoint, headers, nil, silent)
-end
-
-function SeraphixSDK:verifyKey(keysystemId, key, hwid, silent)
-    silent = silent or false
-    
-    if not keysystemId then
-        formatPrint("Keysystem ID is required", "error", silent)
-        return {
-            success = false,
-            error = "NO_KEYSYSTEM_ID",
-            message = "Keysystem ID is required"
-        }
-    end
-    
-    if not key then
-        formatPrint("Key is required", "error", silent)
+    if script_key == "" then
+        formatPrint("script_key is not set! Please set it like: script_key = 'your_key'", "error", silent)
         return {
             success = false,
             error = "NO_KEY",
-            message = "Key is required"
+            message = "script_key is not set"
         }
     end
     
-    if not hwid then
-        formatPrint("HWID is required", "error", silent)
-        return {
-            success = false,
-            error = "NO_HWID",
-            message = "HWID is required"
-        }
-    end
-    
-    local endpoint = "/v1/keysystems/keys?id=" .. HttpService:UrlEncode(keysystemId)
+    local hwid = getHWID()
+    local endpoint = "/v1/keysystems/keys?id=" .. game:GetService("HttpService"):UrlEncode(keysystem_id)
     local body = {
-        key = key,
+        key = script_key,
         hwid = hwid
     }
     
     return makeRequest("POST", endpoint, nil, body, silent)
 end
-
-function SeraphixSDK:resetKeyHWID(keysystemId, key, silent)
-    silent = silent or false
-    
-    if not self.apiToken then
-        formatPrint("API token is required for this endpoint", "error", silent)
-        return {
-            success = false,
-            error = "NO_TOKEN",
-            message = "API token is required"
-        }
-    end
-    
-    if not keysystemId then
-        formatPrint("Keysystem ID is required", "error", silent)
-        return {
-            success = false,
-            error = "NO_KEYSYSTEM_ID",
-            message = "Keysystem ID is required"
-        }
-    end
-    
-    if not key then
-        formatPrint("Key is required", "error", silent)
-        return {
-            success = false,
-            error = "NO_KEY",
-            message = "Key is required"
-        }
-    end
-    
-    local headers = {
-        ["Authorization"] = "Bearer " .. self.apiToken
+return {
+    keysystem_id = keysystem_id,
+    script_key = script_key,
+    getStatus = getStatus,
+    verifyKey = verifyKey,
+    setBaseUrl = setBaseUrl,
+    getBaseUrl = getBaseUrl,
+    getHWID = getHWID,
+    StatusMessages = {
+        KEY_VALID = "Key is valid and HWID bound successfully",
+        KEY_INVALID = "The provided key is invalid",
+        KEY_EXPIRED = "The key has expired",
+        KEY_HWID_LOCKED = "Key is already bound to a different HWID"
     }
-    
-    local endpoint = "/v1/keysystems/keys/reset?id=" .. HttpService:UrlEncode(keysystemId)
-    local body = {
-        key = key
-    }
-    
-    return makeRequest("PATCH", endpoint, headers, body, silent)
-end
-
-function SeraphixSDK:setBaseUrl(newUrl)
-    API_BASE_URL = newUrl
-    formatPrint("Base URL updated to: " .. newUrl, "info", false)
-end
-
-function SeraphixSDK:getBaseUrl()
-    return API_BASE_URL
-end
-
-SeraphixSDK.StatusMessages = {
-    KEY_VALID = "Key is valid and HWID bound successfully",
-    KEY_INVALID = "The provided key is invalid",
-    KEY_EXPIRED = "The key has expired",
-    KEY_HWID_LOCKED = "Key is already bound to a different HWID"
 }
-
-return SeraphixSDK
